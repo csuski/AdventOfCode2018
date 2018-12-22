@@ -2,12 +2,17 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 )
 
-const players = 10
-const lastMarble = 1618
+// part 1 values
+// const players = 10
+// const lastMarble = 1618
+
+const players = 431
+const lastMarble = 7095000
+
+// this is insanely slow, but not so slow it won't complete, I think it took about 2 hours
 
 func main() {
 
@@ -17,48 +22,36 @@ func main() {
 
 	curNum := 1
 	curMableIdx := 0
-	done := false
-	round := 0
-	for !done {
-		//fmt.Printf("Round = %d\r\n", round)
-		round++
-		for i := range playerScores {
-
-			if curNum%23 == 0 {
-				nextScore := curNum
-				curMableIdx -= 7
-				if curMableIdx < 0 {
-					curMableIdx += len(circle)
-				}
-				nextScore += circle[curMableIdx]
-				playerScores[i] += nextScore
-				if curMableIdx == len(circle)-1 {
-					circle = append(circle[:curMableIdx])
-					curMableIdx = 0
-				} else {
-					circle = append(circle[:curMableIdx], circle[curMableIdx+1:]...)
-				}
-				fmt.Printf("Score %d for %d\r\n", nextScore, curNum)
-				if nextScore == lastMarble {
-					done = true
-					break
-				} else if nextScore > lastMarble {
-					log.Fatalf("Next score (%d) is larger that score we are waiting for (%d)", nextScore, lastMarble)
-				}
-			} else {
-				curMableIdx += 2
-				if curMableIdx > len(circle) {
-					curMableIdx -= len(circle)
-				}
-				circle = append(circle, 0)
-				copy(circle[curMableIdx+1:], circle[curMableIdx:])
-				circle[curMableIdx] = curNum
-			}
-			curNum++
-			//fmt.Printf("[%d] %s\r\n", (i + 1), circleString(circle, curMableIdx))
+	for curNum <= lastMarble {
+		if curNum%100000 == 0 {
+			fmt.Printf("Current number = %d\r\n", curNum)
 		}
+		if curNum%23 == 0 {
+			nextScore := curNum
+			curMableIdx -= 7
+			if curMableIdx < 0 {
+				curMableIdx += len(circle)
+			}
+			nextScore += circle[curMableIdx]
+			playerScores[curNum%players] += nextScore
+			if curMableIdx == len(circle)-1 {
+				circle = append(circle[:curMableIdx])
+				curMableIdx = 0
+			} else {
+				circle = append(circle[:curMableIdx], circle[curMableIdx+1:]...)
+			}
+		} else {
+			curMableIdx += 2
+			if curMableIdx > len(circle) {
+				curMableIdx -= len(circle)
+			}
+			circle = append(circle, 0)
+			copy(circle[curMableIdx+1:], circle[curMableIdx:])
+			circle[curMableIdx] = curNum
+		}
+		curNum++
 	}
-	fmt.Printf("Solution to part 1 = %d\r\n", getHighestScore(playerScores))
+	fmt.Printf("Highest Score = %d\r\n", getHighestScore(playerScores))
 }
 
 func getHighestScore(scores [players]int) int {
