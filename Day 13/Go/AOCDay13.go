@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"os"
 	"sort"
 	"strings"
@@ -62,9 +63,11 @@ type track struct {
 }
 
 type cart struct {
+	id       int
 	xy       gridLoc
 	dir      cartDirection
 	nextTurn turnDirection
+	collided bool
 }
 
 type cartList []cart
@@ -75,6 +78,10 @@ func main() {
 	dat, err := ioutil.ReadFile("day13.dat")
 	check(err)
 	lines := strings.Split(string(dat), "\r\n")
+	part2(lines)
+}
+
+func part1(lines []string) {
 	t, err := readTrack(lines)
 	check(err)
 	ticks := 0
@@ -100,6 +107,38 @@ func main() {
 			fmt.Println(t.String())
 		}
 		//col, exists := t.carts.hasCollision()
+
+		if interactive {
+			text, _ := reader.ReadString('\n')
+			if len(text) > 2 {
+				done = true
+			}
+		}
+	}
+}
+
+func part2(lines []string) {
+	t, err := readTrack(lines)
+	check(err)
+	ticks := 0
+	if interactive {
+		fmt.Printf("Tick: %d\n", ticks)
+		fmt.Println(t.String())
+	}
+	reader := bufio.NewReader(os.Stdin)
+	done := false
+	for !done {
+		ticks++
+		t.runTickRemoveCollisions()
+		if len(t.carts) == 1 {
+			fmt.Printf("Last cart on tick %d at %d,%d\n", ticks, t.carts[0].xy.y, t.carts[0].xy.x)
+			return
+		}
+
+		if interactive {
+			fmt.Printf("Tick: %d\n", ticks)
+			fmt.Println(t.String())
+		}
 
 		if interactive {
 			text, _ := reader.ReadString('\n')
@@ -160,7 +199,8 @@ func readTrackPart(c string, x, y int) (trackPart, error) {
 }
 
 func readCart(c string, x, y int) (cart, bool) {
-	cart := cart{xy: gridLoc{x: x, y: y}}
+	id := rand.Intn(100000)
+	cart := cart{id: id, xy: gridLoc{x: x, y: y}}
 	found := false
 	switch c {
 	case "^":
@@ -228,6 +268,20 @@ func (c cartList) Less(i, j int) bool {
 
 func (c cartList) Swap(i, j int) {
 	c[i], c[j] = c[j], c[i]
+}
+
+func (c cartList) RemoveCollisions() cartList {
+	i := 0
+	l := len(c)
+	for i < l {
+		if c[i].collided {
+			c = append(c[:i], c[i+1:]...)
+			l--
+		} else {
+			i++
+		}
+	}
+	return c[:i]
 }
 
 func (c cartList) GetAtLocation(loc gridLoc) (*cart, bool) {
@@ -298,6 +352,46 @@ func (t track) runTick() (gridLoc, bool) {
 	// resort them after the moves
 	sort.Sort(t.carts)
 	return gridLoc{x: -1, y: -1}, false
+}
+
+func (t *track) runTickRemoveCollisions() {
+	for i := range t.carts {
+		t.carts[i].runTick(t.tracks[t.carts[i].xy])
+		cartsAtLoc := t.carts.GetAllAtLocation(t.carts[i].xy)
+
+		collidedAtLoc := false
+		for j := range cartsAtLoc {
+			// See if a collision actually happened, there may be other carts at this location
+			// that already collided and then got cleaned up, but haven't been removed from the
+			// list yet
+			if cartsAtLoc[j].id != t.carts[i].id && !cartsAtLoc[j].collided {
+				collidedAtLoc = true
+				break
+			}
+		}
+		if collidedAtLoc {
+			t.markCollision(cartsAtLoc)
+		}
+	}
+	// Remove collided carts
+	t.carts = t.carts.RemoveCollisions() // by reference?
+
+	// resort them after the moves
+	sort.Sort(t.carts)
+}
+
+func (t track) markCollision(collidedCarts []cart) {
+	for j := range collidedCarts {
+		for i := range t.carts {
+			if collidedCarts[j].id == t.carts[i].id {
+				t.carts[i].markCollision()
+			}
+		}
+	}
+}
+
+func (c *cart) markCollision() {
+	c.collided = true
 }
 
 func (c *cart) runTick(tp trackPart) {
